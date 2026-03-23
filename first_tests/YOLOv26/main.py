@@ -6,7 +6,7 @@ _dir = os.path.dirname(os.path.abspath(__file__))
 model = YOLO(os.path.join(_dir, "best.pt"))
 
 # Run inference
-results = model.predict(os.path.join(_dir, "image.png"), conf=0.25)
+results = model.predict(os.path.join(_dir, "image5.png"), conf=0.25)
 
 # Process results
 for result in results:
