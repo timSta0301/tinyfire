@@ -1,5 +1,6 @@
 tinyfire_venv/
 dataset/
+data_split
 first_tests/YOLOv26/exported_model_original
 first_tests/YOLOv26/exported_model_pruned
 first_tests/YOLOv26/exported_model_compressed
