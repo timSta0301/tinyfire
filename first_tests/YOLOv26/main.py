@@ -1,75 +1,59 @@
 import os
-import shutil
-from ultralytics import YOLO
-import torch
-import utils
 import copy
-from utils.torch_utils import prune
+import torch
+import torch.nn as nn
+import torch.nn.utils.prune as torch_prune
+from ultralytics import YOLO
 
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from visualize import visualize
 
-# Load model
+
+def prune(model, amount):
+    for m in model.model.modules():
+        if isinstance(m, nn.Conv2d):
+            torch_prune.l1_unstructured(m, name="weight", amount=amount)
+            torch_prune.remove(m, "weight")
+
+
 _dir = os.path.dirname(os.path.abspath(__file__))
+_data_dir = os.path.join(_dir, "..", "..", "data")
 model_original = YOLO(os.path.join(_dir, "best.pt"))
 model_pruned = copy.deepcopy(model_original)
 prune(model_pruned, 0.3)
 
-
-
-# Run inference
-<<<<<<< HEAD
-results = model.predict(os.path.join(_dir, "../../data/image7.png"), conf=0.25)
-
-=======
-results_original = model_original.predict(os.path.join(_dir, "image5.png"), conf=0.25)
->>>>>>> 311659b2ce772310e1b235dc93920a85486d48a6
-# Process results
+results_original = model_original.predict(os.path.join(_data_dir, "image5.png"), conf=0.25)
 for result in results_original:
-    boxes = result.boxes
     visualize(result)
-    for box in boxes:
+    for box in result.boxes:
         cls = int(box.cls[0])
         conf = float(box.conf[0])
-        label = model_original.names[cls]
-        print(f"Detected in Original Model: {label} ({conf:.2f})")
+        print(f"Detected in Original Model: {model_original.names[cls]} ({conf:.2f})")
 
-
-
-results_pruned = model_pruned.predict(os.path.join(_dir, "image5.png"), conf=0.25)
-# Process results
+results_pruned = model_pruned.predict(os.path.join(_data_dir, "image5.png"), conf=0.25)
 for result in results_pruned:
-    boxes = result.boxes
-    for box in boxes:
+    for box in result.boxes:
         cls = int(box.cls[0])
         conf = float(box.conf[0])
-        label = model_pruned.names[cls]
-        print(f"Detected in Pruned Model: {label} ({conf:.2f})")
+        print(f"Detected in Pruned Model: {model_pruned.names[cls]} ({conf:.2f})")
 
-
-# Export Original Model if not already done yet 
-if not os.path.exists(os.path.join(_dir,"exported_model_original")):
+# Export Original Model if not already done yet
+if not os.path.exists(os.path.join(_dir, "exported_model_original")):
     print("Skipping export of original model - Folder already exists")
-    model_original.export(format="tflite", optimize = True, int8 = True)
-    # Output path cannot be specified (bruh), therefore we have to rename it 
-    os.rename(os.path.join(_dir,"best_saved_model"),os.path.join(_dir,"exported_model_original"))
+    model_original.export(format="tflite", optimize=True, int8=True)
+    os.rename(os.path.join(_dir, "best_saved_model"), os.path.join(_dir, "exported_model_original"))
 
 # Export experimental pruned model
-model_pruned.export(format="tflite", optimize = True, int8 = True)
-os.rename(os.path.join(_dir,"best_saved_model"),os.path.join(_dir,"exported_model_pruned"))
+model_pruned.export(format="tflite", optimize=True, int8=True)
+os.rename(os.path.join(_dir, "best_saved_model"), os.path.join(_dir, "exported_model_pruned"))
 
 # Load the exported TFLite model
-model_tflite = YOLO(os.path.join(_dir,"exported_model_pruned","best_int8.tflite"))
+model_tflite = YOLO(os.path.join(_dir, "exported_model_pruned", "best_int8.tflite"))
 
-
-# Run inference on tflite model
-results_tflite = model_tflite.predict(os.path.join(_dir, "image5.png"), conf=0.25)
-# Process results
+results_tflite = model_tflite.predict(os.path.join(_data_dir, "image5.png"), conf=0.25)
 for result in results_tflite:
-    boxes = result.boxes
-    for box in boxes:
+    for box in result.boxes:
         cls = int(box.cls[0])
         conf = float(box.conf[0])
-        label = model_pruned.names[cls]
-        print(f"Detected in tflite Model: {label} ({conf:.2f})")
+        print(f"Detected in tflite Model: {model_pruned.names[cls]} ({conf:.2f})")

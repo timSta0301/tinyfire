@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"c:\\\\Users\\\\timst\\\\Documents\\\\Development\\\\tinyfire\\\\tinyfire_venv\\\\Scripts\\\\python.exe\" -c \"from ultralytics.utils.torch_utils import prune; print\\(''ok''\\)\")",
+      "Bash(\"c:\\\\Users\\\\timst\\\\Documents\\\\Development\\\\tinyfire\\\\tinyfire_venv\\\\Scripts\\\\python.exe\" -c \"import ultralytics.utils.torch_utils as m; print\\([x for x in dir\\(m\\) if ''prun'' in x.lower\\(\\)]\\)\")",
+      "Bash(\"c:\\\\Users\\\\timst\\\\Documents\\\\Development\\\\tinyfire\\\\tinyfire_venv\\\\Scripts\\\\python.exe\" -c \"import torch.nn.utils.prune as p; print\\(dir\\(p\\)\\)\")",
+      "Bash(find c:/Users/timst/Documents/Development/tinyfire -name *.png -o -name *.jpg -o -name *.jpeg)"
+    ]
+  }
+}
