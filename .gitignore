@@ -5,3 +5,4 @@ first_tests/YOLOv26/exported_model_pruned
 first_tests/YOLOv26/exported_model_compressed
 first_tests/YOLOv26/best.onnx
 first_tests/YOLOv26/best_saved_model
+.vscode/
