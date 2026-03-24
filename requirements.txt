@@ -1,2 +1,29 @@
-ultralytics
+# Requirements for YOLOv26 export pipeline
+# Usage: pip install -r requirements.txt
+#
+# NOTE: tensorflow and tf_keras versions are pinned deliberately.
+# tf_keras<=2.19 requires TF<2.20, but TF<2.20 has no Python 3.13 wheels.
+# tf_keras 2.19 + tensorflow 2.20 works only when installed with --no-deps
+# to bypass the strict version constraint:
+#
+#   pip install tensorflow==2.20.0 --no-deps
+#   pip install tf_keras==2.19.0 --no-deps
+
+ultralytics==8.4.25
+torch>=2.0.0
+torchvision
+
+# TFLite export
+tensorflow==2.20.0
+tf_keras==2.19.0      # see note above — install with --no-deps
+onnx==1.20.1
+onnxslim==0.1.90
+onnx2tf==1.28.8
+
+# Visualisation
+opencv-python>=4.1.1
+numpy>=1.23.5
+
+
+
 huggingface_hub
