@@ -13,6 +13,9 @@ ultralytics==8.4.25
 torch>=2.0.0
 torchvision
 
+# Pruning
+torch-pruning==1.6.1
+
 # TFLite export
 tensorflow==2.20.0
 tf_keras==2.19.0      # see note above — install with --no-deps
