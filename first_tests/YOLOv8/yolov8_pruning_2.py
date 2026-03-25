@@ -170,7 +170,7 @@ def final_eval_v2(self: BaseTrainer):
 
 
 def strip_optimizer_v2(f: Union[str, Path] = 'best.pt', s: str = '') -> None:
-    x = torch.load(f, map_location=torch.device('cpu'))
+    x = torch.load(f, map_location=torch.device('cpu'), weights_only=False)
     args = {**DEFAULT_CFG_DICT, **x['train_args']}
     if x.get('ema'):
         x['model'] = x['ema']
@@ -271,10 +271,13 @@ def prune(args):
                 ignored_layers.append(m)
 
         example_inputs = example_inputs.to(model.device)
+        # 1. Swap to Taylor Importance
+        importance = tp.importance.GroupTaylorImportance()
+
         pruner = tp.pruner.GroupNormPruner(
             model.model,
             example_inputs,
-            importance=tp.importance.GroupMagnitudeImportance(),
+            importance=importance,
             iterative_steps=1,
             pruning_ratio=pruning_ratio,
             ignored_layers=ignored_layers,
@@ -282,7 +285,26 @@ def prune(args):
         )
 
         tp.utils.print_tool.before_pruning(model.model)
+
+        # 2. Taylor pruning requires gradients. We run a forward pass and
+        # a pseudo-backward pass to calculate feature importance.
+        model.model.zero_grad()
+        out = model.model(example_inputs.to(model.device))
+
+        # YOLOv8 outputs can be complex depending on the mode.
+        # We sum the outputs to create a pseudo-loss to push gradients backward.
+        if isinstance(out, tuple) or isinstance(out, list):
+            pseudo_loss = sum([o.sum() for o in out])
+        else:
+            pseudo_loss = out.sum()
+
+        pseudo_loss.backward()
+
+        # 3. Step the pruner now that gradients are populated
         pruner.step()
+
+        # 4. Clear the dummy gradients before moving to fine-tuning
+        model.model.zero_grad()
         tp.utils.print_tool.after_pruning(model.model, do_print=True)
 
         pruning_cfg['name'] = f"step_{i}_pre_val"

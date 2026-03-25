@@ -15,6 +15,7 @@ Usage:
 import os
 import argparse
 import glob
+import re
 import numpy as np
 import cv2
 import tensorflow as tf
@@ -128,6 +129,19 @@ def export_tflite(model: Model, calib_dir: str, imgsz: int, out_path: str):
     print(f"TFLite INT8: {out_path} ({os.path.getsize(out_path)/1024:.1f} KB)")
 
 
+def get_next_versioned_path(models_dir: str, base_name: str, extension: str) -> str:
+    """Returns models_dir/base_name_<n><extension> with the next available integer n."""
+    pattern = re.compile(rf"^{re.escape(base_name)}_(\d+){re.escape(extension)}$")
+    next_version = 1
+
+    for name in os.listdir(models_dir):
+        match = pattern.match(name)
+        if match:
+            next_version = max(next_version, int(match.group(1)) + 1)
+
+    return os.path.join(models_dir, f"{base_name}_{next_version}{extension}")
+
+
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--data", default=os.path.join(_DIR, "..", "..", "data_split"))
@@ -185,8 +199,14 @@ def main():
     with open(names_path, "w") as f:
         f.write("\n".join(class_names))
 
+    models_dir = os.path.join(_DIR, "models")
+    os.makedirs(models_dir, exist_ok=True)
+
     model, base = build_model(num_classes, args.imgsz, args.alpha)
-    best_path = os.path.join(_DIR, "mobilenetv1_fire_best.keras")
+    best_path = get_next_versioned_path(models_dir, "mobilenetv1_fire_best", ".keras")
+    tflite_path = get_next_versioned_path(models_dir, "mobilenetv1_fire_int8", ".tflite")
+    print(f"Saving Keras checkpoint to: {best_path}")
+    print(f"Saving INT8 TFLite export to: {tflite_path}")
 
     callbacks_base = [
         EarlyStopping(patience=7, restore_best_weights=True, verbose=1),
@@ -235,7 +255,6 @@ def main():
     )
 
     # Export INT8 TFLite using training data for calibration
-    tflite_path = os.path.join(_DIR, "mobilenetv1_fire_int8.tflite")
     export_tflite(model, train_dir, args.imgsz, tflite_path)
 
 
