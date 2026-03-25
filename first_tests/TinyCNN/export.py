@@ -55,10 +55,13 @@ def export_onnx(weights_path: str, onnx_path: str) -> None:
     model.eval()
 
     dummy = torch.randn(1, 3, INPUT_SIZE, INPUT_SIZE)
+    # dynamo=False forces the legacy TorchScript-based exporter, which avoids
+    # the onnxscript InlinePass crash that occurs with AvgPool2d in PyTorch 2.x.
     torch.onnx.export(
         model,
         dummy,
         onnx_path,
+        dynamo=False,
         opset_version=17,
         input_names=["input"],
         output_names=["logits"],
