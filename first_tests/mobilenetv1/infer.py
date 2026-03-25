@@ -1,10 +1,14 @@
 """
-Run MobileNetV1 INT8 TFLite inference on a fire image.
-No Keras/ultralytics dependency — mirrors what runs on the microcontroller.
+Run inference on the latest MobileNetV1 fire/smoke/other model.
+
+Supports:
+- Keras checkpoints (*.keras, *.h5) from training
+- INT8/float TFLite (*.tflite) for deployment checks
 
 Usage:
     python infer.py --image ../../data/image.png
-    python infer.py --image ../../data/image.png --conf 0.4 --top-k 3
+    python infer.py --image ../../data/image.png --model mobilenetv1_fire_best.keras
+    python infer.py --image ../../data/image.png --model mobilenetv1_fire_int8.tflite --conf 0.4 --top-k 3
 """
 
 import os
@@ -15,7 +19,8 @@ import tensorflow as tf
 from tensorflow.keras.applications.mobilenet import preprocess_input
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_MODEL = os.path.join(_DIR, "mobilenetv1_fire_int8.tflite")
+_DEFAULT_KERAS_MODEL = os.path.join(_DIR, "mobilenetv1_fire_best.keras")
+_DEFAULT_TFLITE_MODEL = os.path.join(_DIR, "mobilenetv1_fire_int8.tflite")
 _DEFAULT_NAMES = os.path.join(_DIR, "names.txt")
 
 
@@ -26,16 +31,20 @@ def load_names(path: str) -> dict[int, str]:
     return {0: "fire", 1: "smoke", 2: "neutral"}
 
 
-def preprocess(image_path: str, h: int, w: int, dtype) -> np.ndarray:
+def resolve_default_model() -> str:
+    # Prefer latest Keras checkpoint for validating freshest training results.
+    if os.path.isfile(_DEFAULT_KERAS_MODEL):
+        return _DEFAULT_KERAS_MODEL
+    return _DEFAULT_TFLITE_MODEL
+
+
+def load_image_rgb(image_path: str, h: int, w: int) -> np.ndarray:
     img = cv2.imread(image_path)
     if img is None:
         raise FileNotFoundError(f"Image not found: {image_path}")
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, (w, h))
-    img = np.expand_dims(img, 0)  # [1, H, W, 3]
-    if dtype == np.uint8:
-        return img.astype(np.uint8)
-    return preprocess_input(img.astype(np.float32))  # [0,255] → [-1,1]
+    return img
 
 
 def dequantize(output: np.ndarray, quantization: tuple) -> np.ndarray:
@@ -43,9 +52,7 @@ def dequantize(output: np.ndarray, quantization: tuple) -> np.ndarray:
     return (output.astype(np.float32) - zero_point) * scale
 
 
-def infer(model_path: str, image_path: str, top_k: int = 3, conf: float = 0.0):
-    names = load_names(_DEFAULT_NAMES)
-
+def run_tflite(model_path: str, image_path: str) -> np.ndarray:
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
 
@@ -53,14 +60,45 @@ def infer(model_path: str, image_path: str, top_k: int = 3, conf: float = 0.0):
     out_det = interpreter.get_output_details()[0]
 
     h, w = in_det["shape"][1], in_det["shape"][2]
-    img = preprocess(image_path, h, w, in_det["dtype"])
+    img = load_image_rgb(image_path, h, w)
+    img = np.expand_dims(img, 0)
 
-    interpreter.set_tensor(in_det["index"], img)
+    if in_det["dtype"] == np.uint8:
+        input_tensor = img.astype(np.uint8)
+    else:
+        input_tensor = preprocess_input(img.astype(np.float32))
+
+    interpreter.set_tensor(in_det["index"], input_tensor)
     interpreter.invoke()
-    output = interpreter.get_tensor(out_det["index"])[0]  # [num_classes]
+    output = interpreter.get_tensor(out_det["index"])[0]
 
     if out_det["dtype"] == np.uint8:
         output = dequantize(output, out_det["quantization"])
+
+    return output.astype(np.float32)
+
+
+def run_keras(model_path: str, image_path: str) -> np.ndarray:
+    model = tf.keras.models.load_model(model_path)
+    h, w = model.input_shape[1], model.input_shape[2]
+
+    img = load_image_rgb(image_path, h, w)
+    x = np.expand_dims(img.astype(np.float32), 0)
+    x = preprocess_input(x)
+    output = model.predict(x, verbose=0)[0]
+    return output.astype(np.float32)
+
+
+def infer(model_path: str, image_path: str, top_k: int = 3, conf: float = 0.0):
+    names = load_names(_DEFAULT_NAMES)
+
+    ext = os.path.splitext(model_path)[1].lower()
+    if ext in (".keras", ".h5"):
+        output = run_keras(model_path, image_path)
+    elif ext == ".tflite":
+        output = run_tflite(model_path, image_path)
+    else:
+        raise ValueError(f"Unsupported model type: {model_path}")
 
     top_indices = np.argsort(output)[::-1][:top_k]
 
@@ -77,7 +115,7 @@ def infer(model_path: str, image_path: str, top_k: int = 3, conf: float = 0.0):
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--image", required=True)
-    p.add_argument("--model", default=_DEFAULT_MODEL)
+    p.add_argument("--model", default=resolve_default_model())
     p.add_argument("--top-k", type=int, default=3)
     p.add_argument("--conf", type=float, default=0.0)
     return p.parse_args()

@@ -65,18 +65,25 @@ def make_dataset(directory: str, imgsz: int, batch_size: int, augment: bool,
 
     ds = tf.keras.utils.image_dataset_from_directory(directory, **kwargs)
     class_names = ds.class_names
-    # Preprocess: [0,255] → [-1,1]
-    ds = ds.map(lambda x, y: (preprocess_input(x), y), num_parallel_calls=tf.data.AUTOTUNE)
 
     if augment:
+        # Apply augmentation in image space [0,255] before MobileNet preprocessing.
         aug = tf.keras.Sequential([
             layers.RandomFlip("horizontal"),
-            layers.RandomRotation(0.08),
-            layers.RandomZoom(0.08),
-            layers.RandomBrightness(0.1),
-            layers.RandomContrast(0.1),
+            layers.RandomRotation(0.05),
+            layers.RandomZoom(0.06),
+            layers.RandomBrightness(0.08, value_range=(0.0, 255.0)),
+            layers.RandomContrast(0.08),
         ])
-        ds = ds.map(lambda x, y: (aug(x, training=True), y), num_parallel_calls=tf.data.AUTOTUNE)
+        ds = ds.map(
+            lambda x, y: (aug(tf.cast(x, tf.float32), training=True), y),
+            num_parallel_calls=tf.data.AUTOTUNE,
+        )
+    else:
+        ds = ds.map(lambda x, y: (tf.cast(x, tf.float32), y), num_parallel_calls=tf.data.AUTOTUNE)
+
+    # Preprocess: [0,255] → [-1,1]
+    ds = ds.map(lambda x, y: (preprocess_input(x), y), num_parallel_calls=tf.data.AUTOTUNE)
 
     return ds.prefetch(tf.data.AUTOTUNE), class_names
 
@@ -128,9 +135,11 @@ def parse_args():
     p.add_argument("--alpha", type=float, default=0.25)
     p.add_argument("--batch", type=int, default=32)
     p.add_argument("--epochs", type=int, default=30)
-    p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--unfreeze-epochs", type=int, default=15,
                    help="Extra epochs after unfreezing the base")
+    p.add_argument("--unfreeze-ratio", type=float, default=0.35,
+                   help="Fraction of top base-model layers to unfreeze in phase 2")
     p.add_argument("--val-split", type=float, default=0.15,
                    help="Fraction of train data used for validation when val/ is empty")
     return p.parse_args()
@@ -199,12 +208,24 @@ def main():
         callbacks=callbacks_base,
     )
 
-    # --- Phase 2: fine-tune full model ---
+    # --- Phase 2: fine-tune top layers only (keep BatchNorm frozen) ---
     base.trainable = True
+    total_layers = len(base.layers)
+    n_unfreeze = max(1, int(total_layers * args.unfreeze_ratio))
+    split_idx = total_layers - n_unfreeze
+    for i, layer in enumerate(base.layers):
+        trainable = i >= split_idx
+        if isinstance(layer, layers.BatchNormalization):
+            trainable = False
+        layer.trainable = trainable
+
+    trainable_count = sum(1 for l in base.layers if l.trainable)
+    print(f"Phase 2 unfreezing {trainable_count}/{total_layers} base layers")
+
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(args.lr / 10),
+        optimizer=tf.keras.optimizers.Adam(args.lr / 5),
         loss="categorical_crossentropy",
-        metrics=["accuracy"],
+        metrics=["accuracy", tf.keras.metrics.TopKCategoricalAccuracy(k=2, name="top2_acc")],
     )
     print(f"\nPhase 2: full fine-tune ({args.unfreeze_epochs} epochs)")
     model.fit(
