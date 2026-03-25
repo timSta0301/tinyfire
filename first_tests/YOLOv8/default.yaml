@@ -1,0 +1,26 @@
+# default.yaml - YOLOv8 Pruning & Fine-tuning Configuration
+
+# --- Core Training Settings ---
+task: detect          # YOLO task
+mode: train           # YOLO mode
+imgsz: 640            # Image resolution for training and validation
+batch: 16             # Training batch size (adjust based on your GPU VRAM)
+device: cpu             # GPU device index (use '' for CPU, '0' for first GPU)
+workers: 8            # Number of CPU workers for data loading
+
+# --- Optimizer & Learning Rate ---
+optimizer: auto       # Optimizer (SGD, Adam, AdamW, or auto)
+lr0: 0.005            # Initial learning rate (slightly lower than default 0.01 for fine-tuning)
+lrf: 0.01             # Final learning rate fraction
+momentum: 0.937       # Optimizer momentum
+weight_decay: 0.0005  # Weight decay for regularization
+
+# --- Augmentations (kept moderate to prevent underfitting during recovery) ---
+mosaic: 1.0           # Mosaic data augmentation probability
+close_mosaic: 10      # Disable mosaic in the last X epochs to stabilize fine-tuning
+mixup: 0.0            # Mixup augmentation probability
+
+# --- Loss Weights ---
+box: 7.5              # Box loss gain
+cls: 0.5              # Class loss gain
+dfl: 1.5              # DFL (Distribution Focal Loss) gain

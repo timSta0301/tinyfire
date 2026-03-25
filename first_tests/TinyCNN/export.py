@@ -22,8 +22,19 @@ import argparse
 import os
 import sys
 
+import struct
+
 import numpy as np
+import onnx.helper
 import torch
+
+# onnx_graphsurgeon (onnx2tf dependency) references onnx.helper.float32_to_bfloat16
+# which was removed in onnx 1.16+.  Restore it before onnx2tf is imported.
+if not hasattr(onnx.helper, "float32_to_bfloat16"):
+    def _float32_to_bfloat16(val: float) -> int:
+        packed = struct.pack(">f", val)   # big-endian float32
+        return struct.unpack(">H", packed[:2])[0]  # upper 2 bytes = bfloat16
+    onnx.helper.float32_to_bfloat16 = _float32_to_bfloat16
 
 # ── path hack ───────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(__file__))
@@ -44,10 +55,13 @@ def export_onnx(weights_path: str, onnx_path: str) -> None:
     model.eval()
 
     dummy = torch.randn(1, 3, INPUT_SIZE, INPUT_SIZE)
+    # dynamo=False forces the legacy TorchScript-based exporter, which avoids
+    # the onnxscript InlinePass crash that occurs with AvgPool2d in PyTorch 2.x.
     torch.onnx.export(
         model,
         dummy,
         onnx_path,
+        dynamo=False,
         opset_version=17,
         input_names=["input"],
         output_names=["logits"],

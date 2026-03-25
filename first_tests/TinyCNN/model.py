@@ -2,12 +2,12 @@
 TinyCNN: Micro-scale fire/smoke/other classifier for Arduino Nano 33 BLE.
 
 Architecture: Depthwise-separable convolutions (MobileNet-style)
-  stem:   Conv(3→32, stride=2)    → 48×48×32
-  block1: DWSep(32→64, stride=1)  → 48×48×64
-  block2: DWSep(64→128, stride=2) → 24×24×128
-  block3: DWSep(128→128,stride=1) → 24×24×128
-  block4: DWSep(128→256,stride=2) → 12×12×256
-  block5: DWSep(256→256,stride=1) → 12×12×256
+  stem:   Conv(3→32, stride=2)    → 24×24×32
+  block1: DWSep(32→64, stride=1)  → 24×24×64
+  block2: DWSep(64→128, stride=2) → 12×12×128
+  block3: DWSep(128→128,stride=1) → 12×12×128
+  block4: DWSep(128→256,stride=2) →  6×6×256
+  block5: DWSep(256→256,stride=1) →  6×6×256
   GAP → Linear(256, num_classes)
 
 ~134 K parameters → ~134 kB when exported as INT8 TFLite (well under 500 kB).
@@ -23,7 +23,7 @@ import torch.nn as nn
 
 
 CLASS_NAMES = ["fire", "other", "smoke"]
-INPUT_SIZE = 96  # pixels (square)
+INPUT_SIZE = 48  # pixels (square) — fits nRF52840 100 KB arena
 
 
 class DWSepBlock(nn.Module):
@@ -67,7 +67,12 @@ class TinyCNN(nn.Module):
             DWSepBlock(128, 256, stride=2),
             DWSepBlock(256, 256, stride=1),
         )
-        self.pool = nn.AdaptiveAvgPool2d(1)
+        # Fixed-size pool: spatial dims are always 6×6 before this layer
+        # (48 → stride-2 → 24 → stride-2 → 12 → stride-2 → 6).
+        # AvgPool2d(6) exports to AVERAGE_POOL_2D in TFLite (NHWC-native).
+        # AdaptiveAvgPool2d(1) would cause onnx2tf to insert a TRANSPOSE op
+        # which crashes on TFLite Micro during Invoke().
+        self.pool = nn.AvgPool2d(kernel_size=6)
         self.classifier = nn.Linear(256, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

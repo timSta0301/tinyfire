@@ -10,3 +10,31 @@ first_tests/YOLOv26/best_saved_model
 first_tests/YOLOv26/utils/*
 first_tests/TinyCNN
 tinyfirelinux_venv
+=======
+tinyfire_venv/
+dataset/
+.vscode/
+
+# YOLOv26 generated files
+first_tests/YOLOv26/exported_model_original/
+first_tests/YOLOv26/exported_model_pruned/
+first_tests/YOLOv26/exported_model_compressed/
+first_tests/YOLOv26/best.onnx
+first_tests/YOLOv26/best_saved_model/
+
+# YOLOv26n generated files
+first_tests/YOLOv26n/yolo26n-cls_saved_model/
+first_tests/YOLOv26n/*.tflite
+first_tests/YOLOv26n/*.onnx
+
+# TinyCNN generated files (run distill.py → export.py → to_c_array.py to reproduce)
+first_tests/TinyCNN/tinycnn.pth
+first_tests/TinyCNN/tinycnn.onnx
+first_tests/TinyCNN/tinycnn_slim.onnx
+first_tests/TinyCNN/tinycnn_saved_model/
+first_tests/TinyCNN/tiny_cnn_int8.tflite
+first_tests/TinyCNN/model_data.h
+
+# Prepared classification dataset (run prepare_dataset.py to reproduce)
+../datasets/TinyCNN_data/
+>>>>>>> 7b06f6698898956423a6265728d3534191d4d5b3
