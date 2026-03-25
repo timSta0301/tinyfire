@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+tinyfire_venv/
+dataset/
+data_split
+first_tests/YOLOv26/exported_model_original
+first_tests/YOLOv26/exported_model_pruned
+first_tests/YOLOv26/exported_model_compressed
+first_tests/YOLOv26/best.onnx
+first_tests/YOLOv26/best_saved_model
+.vscode/
+first_tests/YOLOv26/utils/*
+first_tests/TinyCNN
+tinyfirelinux_venv
+=======
 tinyfire_venv/
 dataset/
 .vscode/
@@ -24,3 +38,4 @@ first_tests/TinyCNN/model_data.h
 
 # Prepared classification dataset (run prepare_dataset.py to reproduce)
 ../datasets/TinyCNN_data/
+>>>>>>> 7b06f6698898956423a6265728d3534191d4d5b3
