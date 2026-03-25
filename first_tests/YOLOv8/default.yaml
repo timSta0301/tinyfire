@@ -3,9 +3,11 @@
 # --- Core Training Settings ---
 task: detect          # YOLO task
 mode: train           # YOLO mode
-imgsz: 640            # Image resolution for training and validation
-batch: 16             # Training batch size (adjust based on your GPU VRAM)
+imgsz: 320            # Reduced from 640. Cuts compute by ~58%
+batch: 32             # Since we lowered imgsz, you can likely double the batch size to push the GPU harder
 device: cpu             # GPU device index (use '' for CPU, '0' for first GPU)
+cache: ram            # Loads all 8000 images into RAM for instant batching
+amp: True             # Forces Automatic Mixed Precision
 workers: 8            # Number of CPU workers for data loading
 
 # --- Optimizer & Learning Rate ---
